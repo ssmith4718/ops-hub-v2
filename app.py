@@ -12,11 +12,11 @@ KPI_URL = "https://docs.google.com/spreadsheets/d/1KpN1zyLK4164aTuxu4O-4UOhY4fJo
 LEADS_URL = "https://docs.google.com/spreadsheets/d/1KwDaiO_kurvvvqlTqEWVPDQt0OoIdud1dX5KvpOwxcw/edit?usp=drive_web"
 TASKS_URL = "https://docs.google.com/spreadsheets/d/1UDsAIsNsXkuBNbwPllQcR-WVCyypz8QTDjl3c0F03gk/edit?usp=drive_web"
 
-# Read Data safely
+# Read Data safely and pull fresh data every time (ttl=0)
 try:
-    df_kpi = conn.read(spreadsheet=KPI_URL)
-    df_leads = conn.read(spreadsheet=LEADS_URL)
-    df_tasks = conn.read(spreadsheet=TASKS_URL)
+    df_kpi = conn.read(spreadsheet=KPI_URL, ttl=0)
+    df_leads = conn.read(spreadsheet=LEADS_URL, ttl=0)
+    df_tasks = conn.read(spreadsheet=TASKS_URL, ttl=0)
 except Exception:
     st.error("⚠️ Connection Error. Check Google Sheets permissions.")
     st.stop()
@@ -48,52 +48,53 @@ if page == "🏠 Home Dashboard":
 
 # --- PAGE 2: GOALS & KPIs ---
 elif page == "🎯 Goals & KPIs":
-    st.title("Goals & KPIs")
+    st.title("Targets & KPIs")
     
-    # Visual Metrics
+    # 1. App-Style Quick Update Form
+    st.subheader("⚡ Quick Update Metric")
+    st.markdown("Select an existing metric below to quickly update your progress.")
+    
     if not df_kpi.empty:
-        st.subheader("Current Numbers")
-        st.dataframe(df_kpi, use_container_width=True, hide_index=True)
-    
-    # App-style editor
-    with st.expander("⚙️ Update Dashboard Numbers"):
-        st.write("Double-click any cell to adjust your stats:")
-        edited_kpi = st.data_editor(df_kpi, use_container_width=True, num_rows="dynamic", hide_index=True)
-        if st.button("💾 Save to Cloud", key="save_kpi", type="primary"):
-            conn.update(spreadsheet=KPI_URL, data=edited_kpi)
-            st.success("Stats successfully synced!")
+        metric_names = df_kpi['Metric_Name'].tolist()
+        selected_metric = st.selectbox("Select Metric:", metric_names)
+        
+        # Pull current values for the selected metric
+        current_row = df_kpi[df_kpi['Metric_Name'] == selected_metric].iloc[0]
+        
+        # Display large, tap-friendly number inputs
+        col1, col2 = st.columns(2)
+        with col1:
+            new_val = st.number_input("Current Value", value=float(current_row['Value']), step=1.0)
+        with col2:
+            new_goal = st.number_input("Target / Goal", value=float(current_row['Goal_Target']), step=1.0)
+            
+        # Massive, thumb-friendly save button
+        if st.button("💾 Update Metric", type="primary", use_container_width=True):
+            df_kpi.loc[df_kpi['Metric_Name'] == selected_metric, 'Value'] = new_val
+            df_kpi.loc[df_kpi['Metric_Name'] == selected_metric, 'Goal_Target'] = new_goal
+            conn.update(spreadsheet=KPI_URL, data=df_kpi)
+            st.success(f"**{selected_metric}** successfully updated! (Refresh page to see updated list below)")
 
-# --- PAGE 3: LEAD PIPELINE ---
-elif page == "🤝 Lead Pipeline":
-    st.title("Business Development Pipeline")
-    
-    # App-style Entry Form
-    with st.expander("➕ Add a New Lead", expanded=False):
-        with st.form("new_lead_form", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            with col1:
-                new_name = st.text_input("Lead Name")
-                new_company = st.text_input("Company / Brand")
-                new_email = st.text_input("Contact Info (Email/Phone)")
-            with col2:
-                new_source = st.selectbox("Lead Source", ["Networking", "Cold Outreach", "Referral", "Studio Promo", "Other"])
-                new_status = st.selectbox("Current Status", ["New", "Contacted", "Meeting Booked", "In Talks", "Closed/Won", "Closed/Lost"])
-                new_followup = st.date_input("Next Follow-Up Date", date.today())
+    st.divider()
+
+    # 2. Form to Add a Brand New Goal
+    with st.expander("➕ Create a New Goal or KPI", expanded=False):
+        with st.form("new_kpi_form", clear_on_submit=True):
+            new_kpi_name = st.text_input("Metric Name (e.g., Cold Calls, Intro Sessions)")
+            new_kpi_cat = st.selectbox("Category", ["Business Development", "Studio Operations", "Productivity"])
             
-            notes = st.text_area("Notes")
-            submit_lead = st.form_submit_button("Add to Pipeline", type="primary")
+            colA, colB = st.columns(2)
+            with colA:
+                new_kpi_val = st.number_input("Starting Number", value=0.0)
+            with colB:
+                new_kpi_target = st.number_input("Target Goal", value=0.0)
+                
+            new_kpi_time = st.selectbox("Timeframe", ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly"])
             
-            if submit_lead and new_name:
+            submit_kpi = st.form_submit_button("Add New Target", type="primary", use_container_width=True)
+            
+            if submit_kpi and new_kpi_name:
                 new_row = pd.DataFrame([{
-                    "Date_Added": date.today().strftime("%Y-%m-%d"), "Lead_Name": new_name, 
-                    "Company": new_company, "Contact_Info": new_email, "Lead_Source": new_source,
-                    "Status": new_status, "Next_Follow_Up": new_followup.strftime("%Y-%m-%d"), "Notes": notes
-                }])
-                updated_leads = pd.concat([df_leads, new_row], ignore_index=True)
-                conn.update(spreadsheet=LEADS_URL, data=updated_leads)
-                st.success(f"{new_name} added to the pipeline! Refresh the page to see changes.")
-
-    st.subheader("Active Database")
-    # Quick Status Filter
-    filter_status = st.selectbox("Filter by Status:", ["All"] + list(df_leads['Status'].unique()))
-    display_leads = df_leads if filter_status == "All" else df_leads[df_leads['Status'] == filter_status]
+                    "Date": date.today().strftime("%Y-%m-%d"), "Metric_Name": new_kpi_name, 
+                    "Category": new_kpi_cat, "Value": new_kpi_val, "Goal_Target": new_kpi_target, 
+                    "Timeframe": new
