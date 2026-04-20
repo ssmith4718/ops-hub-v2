@@ -89,12 +89,4 @@ elif page == "🎯 Goals & KPIs":
             with colB:
                 new_kpi_target = st.number_input("Target Goal", value=0.0)
                 
-            new_kpi_time = st.selectbox("Timeframe", ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly"])
-            
-            submit_kpi = st.form_submit_button("Add New Target", type="primary", use_container_width=True)
-            
-            if submit_kpi and new_kpi_name:
-                new_row = pd.DataFrame([{
-                    "Date": date.today().strftime("%Y-%m-%d"), "Metric_Name": new_kpi_name, 
-                    "Category": new_kpi_cat, "Value": new_kpi_val, "Goal_Target": new_kpi_target, 
-                    "Timeframe": new
+            new
