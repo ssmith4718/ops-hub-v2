@@ -96,4 +96,4 @@ elif page == "🤝 Lead Pipeline":
     st.subheader("Active Database")
     # Quick Status Filter
     filter_status = st.selectbox("Filter by Status:", ["All"] + list(df_leads['Status'].unique()))
-    display_leads = df_leads if filter_status == "All
+    display_leads = df_leads if filter_status == "All" else df_leads[df_leads['Status'] == filter_status]
